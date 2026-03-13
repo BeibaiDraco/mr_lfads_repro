@@ -42,7 +42,10 @@ Everything else is directly matched to the paper.
 - `mr_lfads/evaluate.py` – effectome and message-content metrics
 - `scripts/generate_memory_dataset.py` – generate a synthetic dataset
 - `scripts/train_mr_lfads.py` – train MR-LFADS on a `.npz` dataset
-- `configs/memory_ring_exp1.json` – paper-like defaults for the synthetic memory dataset
+- `configs/memory_ring_exp1.json` – paper defaults (`batch_size=64`, `l2_alpha=1e-4`)
+- `configs/memory_ring_full.json` – stronger L2 variant (`batch_size=128`, `l2_alpha=0.014`)
+- `configs/memory_ring_small_fast.json` – larger-batch variant (`batch_size=128`, `l2_alpha=1e-4`)
+- `configs/smoke_test.json` – tiny run for CI / sanity checks
 
 ## Installation
 
@@ -50,11 +53,11 @@ Everything else is directly matched to the paper.
 pip install -r requirements.txt
 ```
 
-## Quick start
+## Quick start (from a fresh clone)
 
-### 1) Generate a synthetic dataset
+### 1) Generate the synthetic dataset
 
-Paper-like 3-region memory network:
+This step trains a small data-generating network and samples trials. It only needs to be run once.
 
 ```bash
 python scripts/generate_memory_dataset.py \
@@ -65,7 +68,7 @@ python scripts/generate_memory_dataset.py \
   --train_epochs 300
 ```
 
-### 2) Train MR-LFADS
+### 2a) Train with paper defaults
 
 ```bash
 python scripts/train_mr_lfads.py \
@@ -74,7 +77,25 @@ python scripts/train_mr_lfads.py \
   --config_json configs/memory_ring_exp1.json
 ```
 
-Outputs written to `save_dir`:
+### 2b) Train with the full variant (stronger L2)
+
+```bash
+python scripts/train_mr_lfads.py \
+  --data data/memory_ring_exp1.npz \
+  --save_dir runs/memory_ring_full \
+  --config_json configs/memory_ring_full.json
+```
+
+### 2c) Train with the small-fast variant (larger batch, paper L2)
+
+```bash
+python scripts/train_mr_lfads.py \
+  --data data/memory_ring_exp1.npz \
+  --save_dir runs/memory_ring_small_fast \
+  --config_json configs/memory_ring_small_fast.json
+```
+
+Outputs written to each `save_dir`:
 
 - `best_model.pt`
 - `last_model.pt`
