@@ -4,7 +4,7 @@ This is a paper-faithful reimplementation of **MR-LFADS** from:
 
 > Belle Liu, Jacob Sacks, Matthew D. Golub. *Accurate Identification of Communication Between Multiple Interacting Neural Populations*. ICML 2025.
 
-It is built from the public `lfads-torch` codebase you uploaded, but rewritten as a standalone multi-region package so the MR-LFADS architecture is explicit.
+It is built from the `lfads-torch` (https://github.com/arsedler9/lfads-torch).
 
 ## What is implemented
 
@@ -123,4 +123,4 @@ Because the paper did not release code, this is a **faithful reimplementation**,
 - some hidden dimensions for encoders/controllers
 - some optimizer/dropout details not listed in the appendix
 
-The defaults here were chosen to follow the paper and the uploaded `lfads-torch` code as closely as possible.
+
