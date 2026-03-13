@@ -95,6 +95,30 @@ python scripts/train_mr_lfads.py \
   --config_json configs/memory_ring_small_fast.json
 ```
 
+### Choosing fixed-point message timing
+
+All configs default to `"message_timing": "lagged"`. To use the fixed-point variant instead, edit the `"message_timing"` field in any config JSON to `"fixed_point"`:
+
+```json
+{
+  "message_timing": "fixed_point",
+  "fixed_point_iters": 2
+}
+```
+
+Or copy an existing config and change just that field:
+
+```bash
+cp configs/memory_ring_full.json configs/memory_ring_full_fp.json
+# edit "message_timing": "fixed_point" in the new file, then:
+python scripts/train_mr_lfads.py \
+  --data data/memory_ring_exp1.npz \
+  --save_dir runs/memory_ring_full_fp \
+  --config_json configs/memory_ring_full_fp.json
+```
+
+See the [ambiguity note above](#one-ambiguity-in-the-paper) for background on the two options.
+
 Outputs written to each `save_dir`:
 
 - `best_model.pt`
