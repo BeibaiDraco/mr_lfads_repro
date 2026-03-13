@@ -1,0 +1,19 @@
+{
+  "stim_dims": [
+    2,
+    3,
+    4
+  ],
+  "hidden_size": 64,
+  "total_steps": 200,
+  "tau": 10,
+  "noise_std": 0.1,
+  "delay": 2,
+  "history_window": 5,
+  "train_epochs": 300,
+  "train_batch_size": 2048,
+  "train_batches_per_epoch": 1,
+  "train_lr": 0.001,
+  "weight_decay": 1e-05,
+  "seed": 0
+}
