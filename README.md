@@ -44,10 +44,10 @@ The paper's equations create a within-timestep cycle: `gₜ` depends on messages
 
 | Mode | Flag | Behaviour |
 |---|---|---|
-| **Lagged** *(default)* | `"message_timing": "lagged"` | Messages emitted at `t` are consumed at `t + 1` |
+| **Lagged** *(default, recommended)* | `"message_timing": "lagged"` | Messages emitted at `t` are consumed at `t + 1` |
 | **Fixed-point** | `"message_timing": "fixed_point"` | A small fixed-point loop approximates instantaneous coupling |
 
-See [Choosing fixed-point message timing](#choosing-fixed-point-message-timing) for configuration details.
+**We recommend `lagged` timing.** With the KL floor stabilisation described below, lagged timing achieves effectome cosine similarity of 0.997 on the paper's Experiment 1 benchmark, while being faster than fixed-point (one pass per timestep vs *K* passes).
 
 ---
 
@@ -78,10 +78,11 @@ python scripts/generate_memory_dataset.py \
 
 Pick a configuration that suits your needs:
 
-| Config | Batch size | L2 | Notes |
-|---|---|---|---|
-| [`memory_ring_full.json`](configs/memory_ring_full.json) | 128 | 0.014 | Main config (stronger L2) |
-| [`smoke_test.json`](configs/smoke_test.json) | — | — | Tiny run for CI / sanity checks |
+| Config | Dataset | Notes |
+|---|---|---|
+| [`memory_ring_full.json`](configs/memory_ring_full.json) | 64 neurons, 1024 trials | **Recommended.** Matches paper Experiment 1. |
+| [`memory_ring_small_fast.json`](configs/memory_ring_small_fast.json) | 16 neurons, 300 trials | Quick iteration (~35 min). Lower effectome quality. |
+| [`smoke_test.json`](configs/smoke_test.json) | — | Tiny run for CI / sanity checks. |
 
 ```bash
 python scripts/train_mr_lfads.py \
@@ -105,16 +106,21 @@ runs/<experiment>/
 └── effectome_valid.npy
 ```
 
-### Choosing fixed-point message timing
+### Training stability: KL floor
 
-All configs default to `"message_timing": "lagged"`. To switch to the fixed-point variant, set the field in any config JSON:
+The paper's staged KL schedule ramps `β_u` from zero starting at epoch 50. During the preceding warm-up, latent variables can grow very large (unconstrained). When the KL penalty suddenly activates, the resulting gradient shock can destroy learned representations — especially for larger models (64+ neurons per region).
 
-```json
-{
-  "message_timing": "fixed_point",
-  "fixed_point_iters": 2
-}
-```
+This implementation applies a **KL floor** (`kl_floor = 1e-3`): the KL ramp multiplier never drops below 0.001, even during warm-up. This keeps latent variables bounded without meaningfully affecting reconstruction, and ensures a smooth transition when the full KL schedule begins. With this fix, the model preserves its warm-up representations and follows the intended optimisation path.
+
+| Without KL floor | With KL floor |
+|---|---|
+| Epoch 51 spike: recon jumps from -1.05 to +86 | Smooth transition: recon stays at -1.08 |
+| Warm-up wasted, converges to suboptimal solution | Warm-up preserved, reaches paper-level results |
+| Effectome cosine ~0.87 | Effectome cosine **0.997** |
+
+### Best-checkpoint selection
+
+The best model checkpoint is saved only after the KL penalties are fully ramped (epoch 250 by default). This prevents selecting a pre-KL checkpoint where message channels have not yet been regularised.
 
 ---
 
@@ -174,7 +180,8 @@ scripts/
 └── train_mr_lfads.py
 
 configs/
-├── memory_ring_full.json
+├── memory_ring_full.json         # Recommended: 64 neurons, 1024 trials
+├── memory_ring_small_fast.json   # Quick iteration: 16 neurons, 300 trials
 └── smoke_test.json
 ```
 
@@ -187,6 +194,13 @@ Because the authors have not released code, this is a **faithful reimplementatio
 - Resolution of the within-timestep message cycle (see [above](#a-note-on-message-timing))
 - Exact hidden dimensions for encoders and controllers
 - Some optimizer and dropout settings not listed in the appendix
+- The paper's L2 coefficient (`α = 10⁴` in Table S1) likely uses a different normalisation convention; our implementation normalises by the number of weight elements
+
+Implementation additions not described in the paper:
+
+- **KL floor** for training stability (see [above](#training-stability-kl-floor))
+- **Best-checkpoint gating** after KL ramp completion
+- **Periodic effectome evaluation** during training (every 20 epochs)
 
 ---
 
