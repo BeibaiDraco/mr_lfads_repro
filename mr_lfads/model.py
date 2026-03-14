@@ -311,8 +311,9 @@ class MRLFADS(nn.Module):
         return float(np.clip((epoch + 1 - start) / (increase + 1), 0.0, 1.0))
 
     def regularization_weights(self, epoch: int) -> dict[str, float]:
-        u_ramp = self._ramp(epoch, self.config.beta_u_start_epoch, self.config.beta_u_increase_epoch)
-        m_ramp = self._ramp(epoch, self.config.beta_m_start_epoch, self.config.beta_m_increase_epoch)
+        kl_floor = 1e-3
+        u_ramp = max(kl_floor, self._ramp(epoch, self.config.beta_u_start_epoch, self.config.beta_u_increase_epoch))
+        m_ramp = max(kl_floor, self._ramp(epoch, self.config.beta_m_start_epoch, self.config.beta_m_increase_epoch))
         l2_ramp = self._ramp(epoch, self.config.l2_start_epoch, self.config.l2_increase_epoch)
         return {
             "beta_g0": float(self.config.beta_g0) * u_ramp,

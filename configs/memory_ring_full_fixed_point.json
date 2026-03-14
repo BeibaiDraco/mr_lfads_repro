@@ -2,7 +2,7 @@
   "input_dim": 4,
   "message_dim": 4,
   "message_from": "rates",
-  "message_timing": "lagged",
+  "message_timing": "fixed_point",
   "fixed_point_iters": 2,
   "beta_u": 0.1,
   "beta_m": 0.01,
@@ -20,7 +20,6 @@
   "lr_decay": 0.95,
   "lr_patience": 6,
   "dropout_rate": 0.02,
-  "grad_clip": 10.0,
   "cell_clip": 5.0,
   "seed": 0,
   "device": "auto"

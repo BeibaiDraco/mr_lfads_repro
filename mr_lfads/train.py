@@ -263,6 +263,14 @@ def train_mr_lfads(
     best_ckpt = save_dir / "best_model.pt"
     last_ckpt = save_dir / "last_model.pt"
 
+    gt_eff = None
+    try:
+        raw_subset = {k: np.asarray(v)[valid_idx] if k.startswith("gt_messages_") else v
+                      for k, v in loaded.raw_npz.items()}
+        gt_eff = ground_truth_effectome(raw_subset)
+    except Exception:
+        pass
+
     for epoch in range(int(train_config.max_epochs)):
         model.train()
         train_metrics: list[dict[str, float]] = []
@@ -314,7 +322,11 @@ def train_mr_lfads(
             "valid_idx": valid_idx,
         }
         torch.save(ckpt_payload, last_ckpt)
-        if valid_mean["recon"] < best_val_recon:
+        kl_fully_ramped_epoch = max(
+            train_config.beta_u_start_epoch + train_config.beta_u_increase_epoch,
+            train_config.beta_m_start_epoch + train_config.beta_m_increase_epoch,
+        )
+        if epoch >= kl_fully_ramped_epoch and valid_mean["recon"] < best_val_recon:
             best_val_recon = valid_mean["recon"]
             torch.save(ckpt_payload, best_ckpt)
 
@@ -323,7 +335,15 @@ def train_mr_lfads(
             f"train_recon={train_mean['recon']:.6f} valid_recon={valid_mean['recon']:.6f} lr={lr_value:.3e}"
         )
 
-    best_payload = torch.load(best_ckpt, map_location=device, weights_only=False)
+        effectome_eval_every = 20
+        if gt_eff is not None and (epoch + 1) % effectome_eval_every == 0:
+            posteriors_snap = _collect_posteriors(model, valid_loader, device)
+            eff_snap = effectome_from_messages(posteriors_snap["messages"])
+            cos_snap = cosine_similarity(eff_snap, gt_eff)
+            print(f"[EFFECTOME] epoch {epoch + 1:4d}  cosine={cos_snap:.4f}")
+
+    eval_ckpt = best_ckpt if best_ckpt.exists() else last_ckpt
+    best_payload = torch.load(eval_ckpt, map_location=device, weights_only=False)
     model.load_state_dict(best_payload["model_state"])
     posteriors = _collect_posteriors(model, valid_loader, device)
     _save_predictions(save_dir, posteriors)
