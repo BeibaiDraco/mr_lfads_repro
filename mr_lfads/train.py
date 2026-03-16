@@ -53,6 +53,7 @@ class TrainConfig:
     l2_start_epoch: int = 0
     l2_increase_epoch: int = 80
     loss_scale: float = 1.0
+    kl_floor: float = 1.0e-3
 
     # Optimization
     seed: int = 0
@@ -218,6 +219,7 @@ def train_mr_lfads(
         l2_start_epoch=train_config.l2_start_epoch,
         l2_increase_epoch=train_config.l2_increase_epoch,
         loss_scale=train_config.loss_scale,
+        kl_floor=train_config.kl_floor,
     )
 
     train_loader, valid_loader, train_idx, valid_idx = create_dataloaders(
@@ -279,6 +281,10 @@ def train_mr_lfads(
             batch = _to_device(batch, device)
             outputs = model(batch["history"], batch["obs"], sample_posteriors=True)
             loss, metrics = model.compute_loss(batch["obs"], outputs, epoch=epoch)
+            if not (torch.isfinite(loss)):
+                print(f"[WARN] non-finite loss={float(loss):.4g} at epoch {epoch+1}, skipping batch")
+                optimizer.zero_grad(set_to_none=True)
+                continue
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=float(train_config.grad_clip))
@@ -297,19 +303,24 @@ def train_mr_lfads(
 
         train_mean = _mean_metrics(train_metrics)
         valid_mean = _mean_metrics(valid_metrics)
-        scheduler.step(valid_mean["recon"])
+
+        if not train_mean or "loss" not in train_mean:
+            print(f"[WARN] epoch {epoch+1}: all train batches were NaN, skipping epoch")
+            continue
+
+        scheduler.step(valid_mean.get("recon", float("nan")))
         lr_value = float(optimizer.param_groups[0]["lr"])
 
         history["train_loss"].append(train_mean["loss"])
         history["train_recon"].append(train_mean["recon"])
-        history["train_kl_g0"].append(train_mean["kl_g0"])
-        history["train_kl_u"].append(train_mean["kl_u"])
-        history["train_kl_m"].append(train_mean["kl_m"])
-        history["valid_loss"].append(valid_mean["loss"])
-        history["valid_recon"].append(valid_mean["recon"])
-        history["valid_kl_g0"].append(valid_mean["kl_g0"])
-        history["valid_kl_u"].append(valid_mean["kl_u"])
-        history["valid_kl_m"].append(valid_mean["kl_m"])
+        history["train_kl_g0"].append(train_mean.get("kl_g0", float("nan")))
+        history["train_kl_u"].append(train_mean.get("kl_u", float("nan")))
+        history["train_kl_m"].append(train_mean.get("kl_m", float("nan")))
+        history["valid_loss"].append(valid_mean.get("loss", float("nan")))
+        history["valid_recon"].append(valid_mean.get("recon", float("nan")))
+        history["valid_kl_g0"].append(valid_mean.get("kl_g0", float("nan")))
+        history["valid_kl_u"].append(valid_mean.get("kl_u", float("nan")))
+        history["valid_kl_m"].append(valid_mean.get("kl_m", float("nan")))
         history["lr"].append(lr_value)
 
         ckpt_payload = {

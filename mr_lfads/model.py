@@ -78,6 +78,7 @@ class MRLFADSConfig:
     l2_start_epoch: int = 0
     l2_increase_epoch: int = 80
     loss_scale: float = 1.0
+    kl_floor: float = 1.0e-3
 
     def __post_init__(self) -> None:
         n_regions = len(self.region_dims)
@@ -171,6 +172,7 @@ class RegionModule(nn.Module):
             self.readout_logvar = None
 
     def _stable_logvar(self, raw_logvar: torch.Tensor) -> torch.Tensor:
+        raw_logvar = torch.clamp(raw_logvar, min=-16.0, max=80.0)
         var = torch.exp(raw_logvar) + self.posterior_var_min
         return torch.log(var)
 
@@ -311,7 +313,7 @@ class MRLFADS(nn.Module):
         return float(np.clip((epoch + 1 - start) / (increase + 1), 0.0, 1.0))
 
     def regularization_weights(self, epoch: int) -> dict[str, float]:
-        kl_floor = 1e-3
+        kl_floor = float(self.config.kl_floor)
         u_ramp = max(kl_floor, self._ramp(epoch, self.config.beta_u_start_epoch, self.config.beta_u_increase_epoch))
         m_ramp = max(kl_floor, self._ramp(epoch, self.config.beta_m_start_epoch, self.config.beta_m_increase_epoch))
         l2_ramp = self._ramp(epoch, self.config.l2_start_epoch, self.config.l2_increase_epoch)
@@ -326,6 +328,7 @@ class MRLFADS(nn.Module):
         }
 
     def _stable_message_logvar(self, raw_logvar: torch.Tensor) -> torch.Tensor:
+        raw_logvar = torch.clamp(raw_logvar, min=-16.0, max=80.0)
         var = torch.exp(raw_logvar) + float(self.config.posterior_var_min)
         return torch.log(var)
 
@@ -349,7 +352,7 @@ class MRLFADS(nn.Module):
         if self.config.message_from == "factors":
             return factor
         if self.config.output_type == "poisson":
-            return torch.exp(mean_or_lograte)
+            return torch.exp(torch.clamp(mean_or_lograte, min=-7.0, max=7.0))
         return mean_or_lograte
 
     def _compute_messages(

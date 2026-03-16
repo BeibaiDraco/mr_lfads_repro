@@ -19,6 +19,7 @@ def diag_gaussian_kl(
 
     Returns a tensor reduced only over the latent dimension.
     """
+    logvar = torch.clamp(logvar, min=-20.0, max=80.0)
     var = torch.exp(logvar)
     prior_logvar = math.log(prior_var)
     kl = 0.5 * (
@@ -32,6 +33,7 @@ def gaussian_nll(target: torch.Tensor, mean: torch.Tensor, logvar: torch.Tensor)
 
 
 def poisson_nll(target: torch.Tensor, lograte: torch.Tensor) -> torch.Tensor:
+    lograte = torch.clamp(lograte, min=-20.0, max=20.0)
     return F.poisson_nll_loss(lograte, target, full=True, reduction="none", log_input=True)
 
 
