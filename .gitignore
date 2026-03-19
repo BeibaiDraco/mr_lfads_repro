@@ -8,7 +8,20 @@ build/
 
 # Data and checkpoints
 data/*.npz
-runs/
+runs/*
+
+# Un-ignore memory_ring_full results (config, metrics, history, effectome, figures)
+!runs/memory_ring_full/
+!runs/memory_ring_full/config_resolved.json
+!runs/memory_ring_full/metrics.json
+!runs/memory_ring_full/history.json
+!runs/memory_ring_full/effectome_valid.npy
+!runs/memory_ring_full/figures_synthetic/
+!runs/memory_ring_full/figures_synthetic/*.png
+
+# Re-ignore large files in memory_ring_full
+runs/memory_ring_full/*.pt
+runs/memory_ring_full/*.npz
 
 # Editor / OS
 .vscode/
